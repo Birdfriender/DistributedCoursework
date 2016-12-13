@@ -4,9 +4,11 @@
 //Size - the width/height of the array
 int main(int argc, char* argv[])
 {
-	int myRank, numProc;
+	int thisRank, numProc;
 	double numRows;
 	double **array, **resultArray;
+
+	int precision = 0.001;
 
 	//Do all the mpi stuff
 	int sc = MPI_Init(&argc, &argv);
@@ -16,7 +18,7 @@ int main(int argc, char* argv[])
 		MPI_Abort(MPI_COMM_WORLD, sc);
 	}
 
-	MPI_Comm_Rank(MPI_COMM_WORLD, &myRank);
+	MPI_Comm_Rank(MPI_COMM_WORLD, &thisRank);
 	MPI_Comm_Size(MPI_COMM_WORLD, &numProc);
 
 	//Parse the arguments
@@ -71,7 +73,32 @@ int main(int argc, char* argv[])
 		array[numRows-1][0] = 1;
 	}
 
+	int allocPerCore = numRows/numProc;
+	int startRow, endRow;
 
+	if (thisRank < numRows % numProc)
+	{
+		startRow = thisRank * (allocPerCore + 1);
+		endRow = startRow + allocPerCore + 1;
+	}
+	else if (thisRank = numRows % numProc)
+	{
+		startRow = thisRank * (allocPerCore + 1);
+		endRow = startRow + allocPerCore;
+	}
+
+
+	int highestChange;
+
+	do
+	{
+		double **temp = resultArray;
+		resultArray = array;
+		array = temp;
+		highestChange = 0;
+
+
+	}while(highestChange > precision)
 
 	MPI_Finalize();
     return 0;
