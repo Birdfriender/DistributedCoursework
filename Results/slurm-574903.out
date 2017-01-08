@@ -1,0 +1,17 @@
+--------------------------------------------------------------------------
+mpirun noticed that process rank 48 with PID 55500 on node node-sw-164 exited on signal 9 (Killed).
+--------------------------------------------------------------------------
+3 total processes killed (some possibly by mpirun during cleanup)
+
+########################################################################
+----------------------! Balena Job Details !----------------------------
+
+JobID          : 574903
+No. of nodes   : 4
+No. of CPUs    : 64
+Timelimit      : 00:10:00
+Elapsed time   : 00:00:14
+Nodelist       : node-sw-[161-164]
+
+########################################################################
+

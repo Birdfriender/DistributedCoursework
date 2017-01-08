@@ -1,0 +1,2 @@
+mpirun -np 4 valgrind --tool=memcheck ./violet.o 100
+mpicc ParalellCoursework.c -o violet.o -g -O0 -Wall -Wextra -lm -Wconversion

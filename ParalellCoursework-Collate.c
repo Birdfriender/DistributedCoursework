@@ -7,9 +7,27 @@
 
 const int SEND_TOP_ROW = 1;
 const int SEND_BOTTOM_ROW = 2;
-const int SEND_WRITE_FLAG = 3;
+const int SEND_ALL_ROWS = 3;
 
 const double precision = 0.001;
+
+void calcStartEndRow(int thisRank, int numActiveRows, int numProc, 
+	int* startRow, int* endRow)
+{
+	int allocPerCore = numActiveRows/numProc;
+	if (thisRank < numActiveRows % numProc)
+	{	
+		// +1 because the top row isnt used
+		*startRow = (thisRank * (allocPerCore + 1)) + 1;
+		*endRow = *startRow + allocPerCore;
+	}
+	else
+	{
+		*startRow = ((numActiveRows % numProc) * (allocPerCore + 1)) + 
+		((thisRank - (numActiveRows % numProc)) * allocPerCore) + 1; 
+		*endRow = *startRow + allocPerCore - 1;
+	}
+}
 
 //Arguments
 //Size - the width/height of the array
@@ -99,21 +117,7 @@ int main(int argc, char* argv[])
 	int startRow = 0, endRow = 0;
 	//How many rows are we actually operating on
 	int numActiveRows = numRows - 2;
-	int allocPerCore = numActiveRows/numProc;
-
-
-	if (thisRank < numActiveRows % numProc)
-	{	
-		// +1 because the top row isnt used
-		startRow = (thisRank * (allocPerCore + 1)) + 1;
-		endRow = startRow + allocPerCore;
-	}
-	else
-	{
-		startRow = ((numActiveRows % numProc) * (allocPerCore + 1)) + 
-		((thisRank - (numActiveRows % numProc)) * allocPerCore) + 1; 
-		endRow = startRow + allocPerCore - 1;
-	}
+	calcStartEndRow(thisRank, numActiveRows, numProc, &startRow, &endRow);
 
 	time_t startTime;
 	startTime = time(NULL);
@@ -192,31 +196,34 @@ int main(int argc, char* argv[])
 	timeinfo = localtime(&startTime);
 	double timeTaken = difftime(endTime, startTime);
 
-	char string[100] = "";
-	sprintf(string, "DistributedResults-%d-%d", numProc, numRows);
-
-
-	FILE *f = fopen(string, "a+");
-	//writes all the data about the run
-	//Then writes in the first row
 	if(thisRank == 0)
 	{
+		int procStart = 0, procEnd = 0;
+		for (int i =1; i < numProc; ++i)
+		{
+			calcStartEndRow(i, numActiveRows, numProc, &procStart, &procEnd);
+			for (int j = procStart; j <= procEnd; ++j)
+			{
+				MPI_Recv(array[j], numRows, MPI_DOUBLE, 
+					i, SEND_ALL_ROWS, MPI_COMM_WORLD, 
+					MPI_STATUS_IGNORE);
+			}	
+		}
+		
+	}
+
+	
+	if(thisRank == 0)
+	{
+		char string[100] = "";
+		sprintf(string, "DistributedResults-%d-%d", numProc, numRows);
+
+
+		FILE *f = fopen(string, "a+");
 		fprintf(f, "Number of processors: %d\n", numProc);
 		fprintf(f, "Size of array: %d\n", numRows);
 		fprintf(f, "Time Taken: %lf\n", timeTaken);
-		for (int i = 0; i < numRows; ++i)
-		{
-			fprintf(f, "1.000000 ");
-		}
-		fprintf(f, "\n");
-	}
-
-
-	int writeFlag = 1;
-	//The first processor wwrites and then signals the next to do so
-	if(thisRank == 0)
-	{
-		for (int j = startRow; j <= endRow; ++j)
+		for (int j = 0; j < numRows; ++j)
 		{
 			for (int k = 0; k < numRows; ++k)
 			{
@@ -224,43 +231,14 @@ int main(int argc, char* argv[])
 			}
 			fprintf(f, "\n");
 		}
-		MPI_Isend(&writeFlag, 1, MPI_INT, thisRank + 1, 
-				SEND_WRITE_FLAG, MPI_COMM_WORLD, &req);
-	}
-	//Each processor waits for the signal to write
-	else
-	{
-		MPI_Recv(&writeFlag, 1, MPI_INT, 
-				thisRank - 1, SEND_WRITE_FLAG, MPI_COMM_WORLD, 
-				MPI_STATUS_IGNORE);
-		for (int j = startRow; j <= endRow; ++j)
-		{
-			for (int k = 0; k < numRows; ++k)
-			{
-				fprintf(f, "%lf ", array[j][k]);
-			}
-			fprintf(f, "\n");
-		}
-		if(thisRank != numProc-1)
-		{
-			MPI_Isend(&writeFlag, 1, MPI_INT, thisRank + 1, 
-				SEND_WRITE_FLAG, MPI_COMM_WORLD, &req);
-		}
-	}
-	//appends the last row
-	if(thisRank == numProc-1)
-	{
-		for (int i = 0; i < numRows; ++i)
-		{
-			fprintf(f, "1.000000 ");
-		}
-		fprintf(f, "\n");
+
+		fclose(f);
 	}
 
-	fclose(f);
 
 	free(array); free(resultArray); free(mem); free(resultMem);
 
 	MPI_Finalize();
     return 0;
 }
+
